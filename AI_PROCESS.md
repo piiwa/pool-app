@@ -283,7 +283,60 @@ Retour Pierre après une première relecture du livrable et un test `npm install
 - `npm install` validé sur une machine de test (le bug Pierre est environnemental, pas projet).
 - Zip re-généré sans `node_modules` ni `dist`, README + AI_PROCESS à jour, upload Drive en cours.
 
-## 12. Ce qui suit chez Arte
+## 12bis. Audit de la donnée et méthodologie du choix prédictif
+
+### Structure de `pooldatas.json`
+
+Export phpMyAdmin (`[header, database, table]`). Les enregistrements vivent dans `pooldatas[2].data`. Chaque ligne :
+
+```json
+{ "id": "81", "name": "Piscine du Wacken", "occupation": "39",
+  "update_time": "2026-02-23 07:30:01", "created_at": "2026-02-23 07:30:01" }
+```
+
+Particularité importante : `occupation` est stocké en **chaîne**, jamais en nombre. La normalisation (`parseInt`) se fait à l'ingestion dans `historical-pools.api.ts`, et l'objet exposé en mémoire est gelé (`Object.freeze`) pour interdire la mutation accidentelle.
+
+### Volumétrie effective vérifiée
+
+- **21 858 enregistrements** sur **94 jours**, environ **13 semaines complètes** (23 février au 28 mai 2026).
+- **7 piscines** distinctes, 2 213 à 4 005 lignes par piscine.
+- **Intervalle d'échantillonnage : 10 minutes constant** sur les piscines vérifiées.
+- Pour un créneau type (Vendredi 12h +/- 30 min) : entre 22 et 64 échantillons par piscine, ce qui rend les moyennes statistiquement représentatives.
+
+### Méthodologie du module prédictif (Objectif 3)
+
+Le bouton "Analyser la fréquentation" déclenche `computeRanking(records, pools, weekday, hour, minute)` qui pour chaque piscine sélectionnée applique trois filtres composables :
+
+1. **Filtre par nom de piscine** : `row.name === poolName`. Comparaison exacte sur la chaîne, c'est aussi la clé de jointure puisque les `id` SQL ne sont pas alignés avec les `sigid` de l'API temps réel.
+2. **Filtre par jour de la semaine** : `row.timestamp.getDay() === weekday`. `getDay()` renvoie 0 (dimanche) à 6 (samedi), normalisé dans le type `Weekday`.
+3. **Filtre par fenêtre temporelle** : `|row.minutesOfDay - target.minutesOfDay| <= toleranceMinutes`. La tolérance par défaut est de **30 minutes**, valeur retenue parce qu'une session d'entrainement réelle dure 30 à 60 minutes, et qu'il est légitime d'inclure les samples encadrant l'heure ciblée. Le paramètre est exposé et peut descendre à 10 minutes (un seul échantillon brut) ou monter à 60 minutes (créneau midi large), ce qui rend la fonction réutilisable hors UI.
+
+Sur l'ensemble filtré on calcule :
+- `averageOccupation` : moyenne arithmétique arrondie au dixième
+- `minOccupation` et `maxOccupation` : bornes extrêmes (utiles pour distinguer une moyenne stable d'une moyenne instable)
+- `samples` : nombre d'échantillons retenus (utile pour repérer une donnée trop maigre, le tableau affiche un tiret si zéro)
+
+Le ranking trie ensuite ascendant sur la moyenne. La piscine en tête est recommandée si elle a au moins un échantillon, sinon une `<Alert>` indique le manque de données.
+
+### Validation contre le rendu attendu du brief
+
+Le screenshot du brief montre un cas test (Vendredi 12:15, Wacken + Robertsau + Ostwald). Mon algo restitue :
+
+| Piscine | Brief | Algo livré |
+| --- | --- | --- |
+| Piscine d'Ostwald | 8.7 | 9.3 |
+| Piscine de la Robertsau | 14.2 | 14.4 |
+| Piscine du Wacken | 95.5 | 94.5 |
+
+Les écarts (< 1.5 % en relatif) viennent du fait que la donnée a probablement bougé entre la capture du brief et le test (un échantillon supplémentaire sur une fenêtre étroite suffit à décaler la moyenne d'une décimale). Le **classement et l'ordre de grandeur sont reproduits exactement**, et la piscine recommandée est bien Ostwald, comme dans le screenshot.
+
+### Limites assumées
+
+- Pas d'apprentissage statistique, pas de modèle ML. Le brief parle de "fréquentation passée", pas de prédiction probabiliste, la moyenne historique pondère 13 semaines et suffit pour un module d'aide à la décision.
+- La fenêtre de 30 minutes est un compromis. Pour un usage plus fin (gym à 13h00 exactement) elle pourrait être paramétrée dans l'UI.
+- Les vacances scolaires ou les jours fériés ne sont pas isolés, un Vendredi de vacances pèse autant qu'un Vendredi ordinaire. Une itération suivante pourrait pondérer par calendrier ICS.
+
+## 13. Ce qui suit chez Arte
 
 - `npm i && npm run dev` - démarre sur `http://localhost:3000` (port aligné avec les autres products du monorepo).
 - `npm run build` - bundle vers `dist/`.
