@@ -9,8 +9,9 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { fr } from 'date-fns/locale';
-import { Box, Stack, Typography } from '@mui/material';
-import { useMemo, useState } from 'react';
+import { Box, Skeleton, Stack, Typography } from '@mui/material';
+import { useMemo, useState, useDeferredValue } from 'react';
+import { ChartSkeleton } from '../../components/common/chart-skeleton';
 import { SectionFeedback } from '../../components/common/section-feedback';
 import { formatLongFrenchDate } from '../../utils/format.utils';
 import { computeDailyCurve } from '../../utils/stats.utils';
@@ -41,10 +42,17 @@ export const StatsPage = () => {
   const [selectedPool, setSelectedPool] = useState<string>(defaultPool);
   const [selectedDate, setSelectedDate] = useState<Date | null>(defaultDate);
 
+  // useDeferredValue keeps the input snappy while the heavy aggregation
+  // settles in the background. A skeleton stands in during the transition.
+  const deferredPool = useDeferredValue(selectedPool);
+  const deferredDate = useDeferredValue(selectedDate);
+  const isStale =
+    deferredPool !== selectedPool || deferredDate !== selectedDate;
+
   const chartData = useMemo(() => {
-    if (!selectedPool || !selectedDate) return [];
-    return computeDailyCurve(occupations, selectedPool, selectedDate);
-  }, [occupations, selectedPool, selectedDate]);
+    if (!deferredPool || !deferredDate) return [];
+    return computeDailyCurve(occupations, deferredPool, deferredDate);
+  }, [occupations, deferredPool, deferredDate]);
 
   const hasData = chartData.some((point) => point.occupation !== null);
 
@@ -66,13 +74,17 @@ export const StatsPage = () => {
           />
         </Stack>
 
-        {selectedDate && (
+        {selectedDate ? (
           <Typography variant="h6" align="center" sx={{ fontWeight: 600 }}>
             Fréquentation le {formatLongFrenchDate(selectedDate)}
           </Typography>
+        ) : (
+          <Skeleton variant="text" width="40%" height={32} sx={{ mx: 'auto' }} />
         )}
 
-        {hasData ? (
+        {isStale ? (
+          <ChartSkeleton />
+        ) : hasData ? (
           <Box>
             <FrequentationChart data={chartData} />
           </Box>

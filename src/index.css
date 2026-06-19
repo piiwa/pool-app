@@ -14,3 +14,27 @@ body {
     -apple-system,
     sans-serif;
 }
+
+/**
+ * View Transitions API: smooth FLIP-like animation when a pool card
+ * jumps to a new position after the user toggles a favourite.
+ * Browsers without support fall back to the immediate layout change.
+ */
+@supports (view-transition-name: pool-card) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 360ms;
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+
+/* Respect users who asked the OS to reduce motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,27 +1,24 @@
 /**
  * `<App>` - top-level component.
  *
- * Owns:
- * - The MUI theme (light / dark) via `useColorMode`.
- * - The active section (`realtime` | `stats` | `predictive`).
- * - The composition of the three feature pages inside `<AppLayout>`.
+ * Owns the MUI theme, the active tab and the composition of the three
+ * feature pages inside `<AppLayout>`. The animated water background is
+ * mounted once here so it persists across tab switches.
  *
- * Performance: stats and predictive pages are code-split with React.lazy
- * so a user who lands on the realtime tab does NOT download the Recharts
- * bundle nor the 2.9 MB of historical data. Bundle savings are listed in
- * AI_PROCESS.md section 7 (eco-responsible choices).
+ * Stats and predictive pages are code-split via `React.lazy` so a user
+ * who lands on the realtime tab does NOT download the Recharts bundle
+ * nor the 2.9 MB of historical data.
  */
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import { Suspense, lazy, useMemo, useState } from 'react';
-import { AppLayout, type AppSection } from './components/layout/app-layout';
+import { AnimatedBackground } from './components/common/animated-background';
 import { SectionFeedback } from './components/common/section-feedback';
+import { AppLayout, type AppSection } from './components/layout/app-layout';
 import { useColorMode } from './hooks/use-color-mode';
 import { buildTheme } from './theme/build-theme';
 import { RealtimePage } from './features/realtime/realtime-page';
 
-// Heavy pages are split out: they pull Recharts (~120 KB gzip) and the
-// historical dataset (~2.9 MB raw / ~190 KB gzip).
 const StatsPage = lazy(() =>
   import('./features/stats/stats-page').then((m) => ({ default: m.StatsPage })),
 );
@@ -51,6 +48,7 @@ const App = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <AnimatedBackground />
       <AppLayout
         title="Fréquentation des piscines de Strasbourg"
         colorMode={mode}
