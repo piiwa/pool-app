@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title">
+  <title id="title">Pool app favicon</title>
+  <defs>
+    <clipPath id="drop-clip">
+      <path d="M32 6 C32 6 14 26 14 40 a18 18 0 0 0 36 0 C50 26 32 6 32 6 Z" />
+    </clipPath>
+  </defs>
+  <rect width="64" height="64" rx="12" ry="12" fill="#F4ECDF" />
+  <path d="M32 6 C32 6 14 26 14 40 a18 18 0 0 0 36 0 C50 26 32 6 32 6 Z"
+        fill="#F4ECDF" stroke="#0E2A4E" stroke-width="2.5" stroke-linejoin="round" />
+  <g clip-path="url(#drop-clip)">
+    <path d="M8 42 Q16 36 24 42 T40 42 T56 42 V58 H8 Z"
+          fill="#0E2A4E" opacity="0.92" />
+    <path d="M8 46 Q16 40 24 46 T40 46 T56 46"
+          fill="none" stroke="#F4ECDF" stroke-width="1.5" stroke-linecap="round" />
+    <path d="M8 51 Q16 45 24 51 T40 51 T56 51"
+          fill="none" stroke="#F4ECDF" stroke-width="1.2" stroke-linecap="round" opacity="0.7" />
+  </g>
+  <path d="M26 18 V36 M26 18 h6 a5 5 0 0 1 0 10 h-6"
+        fill="none" stroke="#0E2A4E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
