@@ -6,6 +6,8 @@
  * - Mount the `<PageHeader>` once so the title and the dark-mode toggle
  *   stay anchored.
  * - Render the tab navigation that drives the section switch.
+ * - Wrap each section in a `<main role="tabpanel">` landmark so the page
+ *   is navigable with assistive technologies.
  *
  * Stays presentational: tab selection state is lifted to `<App>`.
  */
@@ -47,7 +49,7 @@ export const AppLayout = ({
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
+    <Container component="div" maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
       <Stack spacing={3}>
         <PageHeader
           title={title}
@@ -62,18 +64,28 @@ export const AppLayout = ({
           indicatorColor="primary"
           variant="scrollable"
           scrollButtons="auto"
+          aria-label="Navigation entre les trois sections de l'application"
         >
           {SECTION_ORDER.map((id) => (
             <Tab
               key={id}
               value={id}
               label={SECTION_LABELS[id].toUpperCase()}
+              id={`tab-${id}`}
+              aria-controls={`tabpanel-${id}`}
               sx={{ fontWeight: 600 }}
             />
           ))}
         </Tabs>
 
-        <Box>{children}</Box>
+        <Box
+          component="main"
+          role="tabpanel"
+          id={`tabpanel-${section}`}
+          aria-labelledby={`tab-${section}`}
+        >
+          {children}
+        </Box>
       </Stack>
     </Container>
   );

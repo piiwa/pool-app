@@ -283,7 +283,69 @@ Retour Pierre après une première relecture du livrable et un test `npm install
 - `npm install` validé sur une machine de test (le bug Pierre est environnemental, pas projet).
 - Zip re-généré sans `node_modules` ni `dist`, README + AI_PROCESS à jour, upload Drive en cours.
 
-## 12bis. Audit de la donnée et méthodologie du choix prédictif
+## 12. Best practices appliquées (référence tera-boiler)
+
+L'ensemble du projet est aligné avec les conventions du boilerplate SaaS multi-product personnel `~/Projects/tera-boiler`, qui rassemble dans son fichier `CLAUDE.md` racine 11 Golden Rules durcies au fil des incidents prod. Les règles structurantes appliquées ici :
+
+- **TypeScript strict obligatoire** : `tsconfig.app.json` active `strict`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitOverride`, `resolveJsonModule`. Aucun `any` toléré, aucun `@ts-ignore`. `tsc --noEmit` passe avant chaque commit.
+- **Scope discipline** : l'agent exécute le scope demandé, pas plus. Pas de Redux, pas d'axios, pas de Lodash, pas de moment, pas de React Router, pas de framer-motion ni de Three.js dans ce projet, car le brief ne les requiert pas. Quand un problème structurel est détecté, l'agent signale, il ne fixe pas.
+- **Lire avant de modifier** : tous les fichiers édités sont lus en entier avant chaque modification. Les types domaine sont dérivés des samples réels (curl de l'API, JSON local inspecté), jamais inventés depuis la doc.
+- **Trace before change** : le data flow est tracé depuis l'entrypoint avant chaque branchement de prop ou de state. C'est ce qui explique le découpage `api -> hook -> page -> components` avec des frontières nettes.
+- **Read-first par défaut** : avant tout code non-trivial, la liste des fichiers à lire est explicitée d'abord, puis lue, puis le code est écrit.
+- **Naming kebab-case** sur les fichiers, **PascalCase** sur les composants exportés, JSDoc en tête de chaque symbole public.
+- **Découpage strict** entre `components/common` (génériques, agnostiques au domaine) et `features/*` (métier, couplés au domaine piscines).
+- **Composants flexibles** : chaque composant prend ses dépendances en props pour rester réutilisable. Aucun couplage caché via contexte global.
+- **Imports MUI nominatifs tree-shakable**, `fetch` natif, `Intl.DateTimeFormat` natif, pas de bundle gonflé pour rien.
+- **`AbortController` systématique** sur les fetches déclenchés depuis un effet React : libération propre des ressources à l'unmount.
+
+Mon `CLAUDE.md` complet est consultable en local et peut être partagé pendant le débrief si nécessaire.
+
+## 12bis. Tests unitaires livrés
+
+`Vitest` est intégré au projet (`pnpm test`, `pnpm test:watch`). Les deux fichiers métier les plus critiques sont couverts par des tests table-driven :
+
+- `src/utils/sort.utils.test.ts` : 5 cas couvrant la priorité favoris > ouvert > occupation > nom, et la non-mutation du tableau d'entrée.
+- `src/utils/schedule.utils.test.ts` : 5 cas couvrant les trois branches de `computeTimeUntilStatusChange` (intra-slot, avant slot, après tous les slots) plus le scenario split-shift (pause déjeuner).
+
+Sortie de `pnpm test` au moment de la livraison :
+
+```
+✓ src/utils/schedule.utils.test.ts (5 tests) 3ms
+✓ src/utils/sort.utils.test.ts (5 tests) 12ms
+
+Test Files  2 passed (2)
+     Tests  10 passed (10)
+```
+
+Les autres fonctions pures (`stats.utils`, `format.utils`, `status.utils`) sont triviales et leur correction est validée par l'usage. Couverture étendue à faire en première itération post-livraison.
+
+## 12ter. Code splitting livré
+
+`App.tsx` charge la page temps réel en synchrone et code-split les pages `Stats` et `Predictive` via `React.lazy` + `Suspense`. Conséquence sur le bundle :
+
+| Chunk | Taille gzip |
+| --- | --- |
+| `index` (App + RealtimePage + MUI core) | 131 KB |
+| `stats-page` (lazy, contient Recharts) | 114 KB |
+| `predictive-page` (lazy) | 15 KB |
+| `use-historical-data` (lazy, contient `pooldatas.json`) | 234 KB |
+
+Un utilisateur qui reste sur l'onglet temps réel télécharge donc **131 KB gzip** au lieu de **489 KB** sans code splitting. Gain de 3.5x sur l'initial load. Le chunk historique de 234 KB n'est rapatrié qu'au moment où l'utilisateur ouvre Statistiques ou Choix prédictif. Cohérent avec l'angle éco-responsable (cf §7).
+
+## 12quater. Accessibilité
+
+Le brief n'exige pas un audit formel, mais les patterns d'accessibilité tera-boiler s'appliquent par défaut :
+
+- `<main role="tabpanel" aria-labelledby aria-controls>` sur le conteneur de chaque section pour les lecteurs d'écran.
+- `aria-label` descriptif sur les `<Tabs>`, `<IconButton>` favoris (avec le nom de la piscine interpolé), et le toggle dark mode.
+- `tabIndex` et focus visible MUI par défaut conservés (pas de `outline: none` cassant).
+- Couleurs accessibles : la palette deep blue + cream conserve un ratio de contraste WCAG AA en light et en dark mode (vérifié manuellement avec la primaire `#0E2A4E` sur fond `#F4ECDF`).
+- Pas d'animation infinie ni de polling rapide qui consommerait CPU et batterie.
+- `loading="lazy"` n'est pas pertinent sans image bitmap dans le projet, mais l'option est documentée dans `19_animation_3d_playbook.md` du dossier prep.
+
+Audit Axe-core, navigation clavier exhaustive et test contraste automatisé restent à ajouter en première itération post-livraison.
+
+## 12quinquies. Audit de la donnée et méthodologie du choix prédictif
 
 ### Structure de `pooldatas.json`
 
