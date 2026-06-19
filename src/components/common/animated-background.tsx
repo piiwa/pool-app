@@ -7,21 +7,41 @@
  * a calm parallax effect. The waves are inline as data-URIs so the
  * bundle does not balloon with extra image requests.
  *
- * Performance:
- * - Animation runs on `transform: translateX` only (GPU accelerated).
- * - `pointer-events: none` keeps the layer out of the hit tree.
- * - `prefers-reduced-motion` users get a static gradient, no motion.
+ * The path is designed so y(x=0) === y(x=width) AND the slope on each
+ * side is symmetric, which means the wave tiles seamlessly when the
+ * layer is set to repeat-x. No visible seam, no broken curve.
+ *
+ * Performance: animation runs on `transform: translate3d` only (GPU
+ * accelerated). `pointer-events: none` keeps the layer out of the hit
+ * tree. `prefers-reduced-motion` users get a static gradient.
  */
 
 import { Box, GlobalStyles, useTheme } from '@mui/material';
 
+/**
+ * Single-period wave centered on y=160, amplitude ~50. Built from two
+ * cubic beziers that meet at (720, 160) with symmetric control points,
+ * so the slope is continuous across the seam when tiled.
+ */
 const WAVE_PATH =
-  'M0,160L48,170.7C96,181,192,203,288,202.7C384,203,480,181,576,160C672,139,768,117,864,128C960,139,1056,181,1152,176C1248,171,1344,117,1392,90.7L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z';
+  'M0,160 C240,110 480,110 720,160 C960,210 1200,210 1440,160 L1440,320 L0,320 Z';
 
 const buildSvgDataUri = (color: string, opacity: number): string => {
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320' preserveAspectRatio='none'><path fill='${color}' fill-opacity='${opacity}' d='${WAVE_PATH}'/></svg>`;
+  const svg =
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320' preserveAspectRatio='none'>" +
+    `<path fill='${color}' fill-opacity='${opacity}' d='${WAVE_PATH}'/>` +
+    '</svg>';
   return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
 };
+
+interface WaveLayer {
+  color: string;
+  opacity: number;
+  durationSeconds: number;
+  bottomOffset: string;
+  height: number;
+  scale: number;
+}
 
 export const AnimatedBackground = () => {
   const theme = useTheme();
@@ -33,15 +53,38 @@ export const AnimatedBackground = () => {
     ? 'linear-gradient(180deg, #0A1428 0%, #11203A 60%, #142A4E 100%)'
     : 'linear-gradient(180deg, #FBF5E9 0%, #F4ECDF 60%, #EFE3CF 100%)';
 
+  const layers: WaveLayer[] = [
+    {
+      color: deep,
+      opacity: isDark ? 0.14 : 0.06,
+      durationSeconds: 42,
+      bottomOffset: '-20%',
+      height: 320,
+      scale: 1.35,
+    },
+    {
+      color: accent,
+      opacity: isDark ? 0.09 : 0.05,
+      durationSeconds: 30,
+      bottomOffset: '-12%',
+      height: 280,
+      scale: 1.18,
+    },
+    {
+      color: deep,
+      opacity: isDark ? 0.18 : 0.08,
+      durationSeconds: 20,
+      bottomOffset: '-4%',
+      height: 240,
+      scale: 1,
+    },
+  ];
+
   return (
     <>
       <GlobalStyles
         styles={{
-          '@keyframes waveDriftSlow': {
-            from: { transform: 'translate3d(0, 0, 0)' },
-            to: { transform: 'translate3d(-50%, 0, 0)' },
-          },
-          '@keyframes waveDriftFast': {
+          '@keyframes waveDrift': {
             from: { transform: 'translate3d(0, 0, 0)' },
             to: { transform: 'translate3d(-50%, 0, 0)' },
           },
@@ -59,46 +102,24 @@ export const AnimatedBackground = () => {
           pointerEvents: 'none',
         }}
       >
-        {/* Three parallax wave layers stacked toward the viewer. */}
-        {[
-          {
-            color: deep,
-            opacity: isDark ? 0.18 : 0.08,
-            duration: 38,
-            bottom: '-30%',
-            scale: 1.4,
-          },
-          {
-            color: accent,
-            opacity: isDark ? 0.1 : 0.07,
-            duration: 26,
-            bottom: '-18%',
-            scale: 1.2,
-          },
-          {
-            color: deep,
-            opacity: isDark ? 0.22 : 0.1,
-            duration: 18,
-            bottom: '-8%',
-            scale: 1,
-          },
-        ].map((layer, idx) => (
+        {layers.map((layer, idx) => (
           <Box
             key={idx}
             sx={{
               position: 'absolute',
               left: 0,
-              bottom: layer.bottom,
+              bottom: layer.bottomOffset,
               width: '200%',
-              height: { xs: 220, md: 320 },
+              height: { xs: layer.height * 0.7, md: layer.height },
               backgroundImage: buildSvgDataUri(layer.color, layer.opacity),
               backgroundRepeat: 'repeat-x',
               backgroundSize: '50% 100%',
-              transform: `scale(${layer.scale})`,
               transformOrigin: 'bottom left',
-              animation: `${idx % 2 === 0 ? 'waveDriftSlow' : 'waveDriftFast'} ${layer.duration}s linear infinite`,
+              animation: `waveDrift ${layer.durationSeconds}s linear infinite`,
+              willChange: 'transform',
               '@media (prefers-reduced-motion: reduce)': {
                 animation: 'none',
+                transform: `scale(${layer.scale})`,
               },
             }}
           />

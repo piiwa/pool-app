@@ -9,6 +9,22 @@
 
 Journal de bord factuel : ce que l'IA a fait, ce qui a été refusé, comment un autre dev reprend la logique.
 
+## TL;DR - une feature par ligne, deux phrases chacune
+
+| Feature | Comment c'est fait |
+|---|---|
+| **Affichage temps réel** | `fetch` natif sur l'API OpenDataSoft, normalisation dans `api/realtime-pools.api.ts` (parse `dayschedule` JSON sérialisé, convertit `updatedate` en `Date`). `<RealtimePage>` mémoise un sort sur `[pools, favoriteIds]` selon la spec (favoris -> ouvertes par occupation croissante -> fermées). |
+| **Card piscine** | `<PoolCard>` outlined, bordure gauche 4px pilotée par `realtimestatus` (GREEN/ORANGE/RED/CLOSED), `<OccupancyBadge>` prominent quand ouvert, label statut uppercase, hover lift `translateY(-3px)`, chip "temps restant" calculé par `computeTimeUntilStatusChange`. |
+| **Favoris** | `useFavorites` garde un `Set<string>` persisté en `localStorage` (clé versionnée). Le toggle utilise la **View Transitions API** pour morpher la card vers sa nouvelle position en 360ms (FLIP gratuit, dégrade en immédiat sur navigateurs sans support). |
+| **Skeletons** | `<PoolCardSkeleton>` reproduit exactement le layout de la card (zéro CLS). `<ChartSkeleton>` couvre la courbe et `useDeferredValue` côté stats laisse les inputs snappy pendant que l'agrégation rejoint. |
+| **Temps restant** | `computeTimeUntilStatusChange` convertit le `dayschedule` en minutes depuis minuit, trie les slots, traite trois branches (intra-slot / avant slot / après dernier slot) et formate `HHhMM fermeture` ou `HHhMM ouverture (demain)`. Couvert par 5 tests Vitest. |
+| **Courbe stats** | `<StatsPage>` filtre `pooldatas.json` (gelé en mémoire, parsé une fois) par piscine + date via `computeDailyCurve`, agrège à l'heure (24 buckets), passe au `<FrequentationChart>` Recharts (ResponsiveContainer + theme MUI plumbed). |
+| **Choix prédictif** | `<PredictivePage>` multi-select + jour + heure, déclenchement explicite via bouton. `computeRanking` applique trois filtres composables (nom, weekday, fenêtre +/-30 min), calcule moyenne / min / max / samples, classe ascendant. Validé contre le screenshot du brief (§12). |
+| **Recommandation + tableau** | `<RecommendationCard>` callout vert + trophée pour la winner, `<ComparisonTable>` surligne la ligne winner avec `success.light` et icône `success.dark`. |
+| **Theme et fond** | `buildTheme(mode)` palette deep blue + cream, serif h1-h3, sans body, `borderRadius: 14`. `<AnimatedBackground>` pose 3 couches SVG en parallax horizontal pure CSS, vague unique seamlessly tilée, `prefers-reduced-motion` respecté. |
+| **Code splitting** | `App.tsx` charge `RealtimePage` en sync et code-split `StatsPage` + `PredictivePage` via `React.lazy` + `Suspense`. Bundle initial 489 KB → **131 KB gzip** pour qui reste sur le temps réel. |
+| **Accessibilité** | `<main role="tabpanel">` + `aria-controls` + `aria-label` sur Tabs et IconButton, `aria-live="polite"` + `aria-busy` pendant loading, contraste WCAG AA vérifié, focus visible MUI préservé. |
+
 ## 1. Compréhension du brief
 
 Application front Vite/React/TS/MUI couvrant trois sections :
